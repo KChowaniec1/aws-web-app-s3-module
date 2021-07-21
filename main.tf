@@ -20,11 +20,7 @@ resource "aws_s3_bucket" "website" {
   acl           = "public-read"
   force_destroy = true
 
-  tags = {
-    Name        = "Website"
-    Environment = var.env
-  }
-
+ #enable CORS
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["PUT", "POST"]
@@ -38,13 +34,14 @@ resource "aws_s3_bucket" "website" {
     error_document = "error.html"
   }
 
-#   server_side_encryption_configuration {
-#     rule {
-#       apply_server_side_encryption_by_default {
-#         sse_algorithm = "AES256"
-#       }
-#     }
-#   }
+  #enable SSE
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
 
   # Enable versioning
   versioning {
@@ -107,11 +104,7 @@ resource "aws_s3_bucket_object" "dist" {
 # SSL CERT
 ###############################################################################
 resource "aws_acm_certificate" "acm" {
-  # A domain name for which the certificate should be issued
-  #provider = aws.us-east-1
   domain_name = var.domain_name
-
-  # Additional names that are supported by this certificate.
   subject_alternative_names = var.alias_domains
 
   validation_method = "DNS"
@@ -127,39 +120,102 @@ resource "aws_acm_certificate" "acm" {
 # }
 
 ###############################################################################
-# WAF with custom rules
+# WAF with rules
 ###############################################################################
 
-# resource "aws_wafv2_web_acl" "web_acl" {
-#     name        = "web_acl"
-#     description = "Web ACL"
-#     scope       = "CLOUDFRONT"
-#     provider    = aws.us-east
-#     default_action {
-#         block {}
-#     }
+resource "aws_wafv2_web_acl" "web_acl" {
+    name        = "web_acl"
+    description = "Web ACL"
+    scope       = "CLOUDFRONT"
+    #provider    = aws.us-east-1
+    default_action {
+        block {}
+    }
 
-#     dynamic "rule" {
-#         for_each = toset(var.rules)
-#         content {
-#             name = rule.value.name
-#             priority = rule.value.priority
-#             override_action {
-#                 count {}
-#             }
-#         statement {
-#             managed_rule_group_statement {
-#                 name = rule.value.managed_rule_group_statement_name
-#                 vendor_name = rule.value.managed_rule_group_statement_vendor_name
-#             }
-#         }
-#         visibility_config {
-#             cloudwatch_metrics_enabled = false
-#             metric_name                = rule.value.metric_name
-#             sampled_requests_enabled   = false
-#         }
-#     }
-# }
+    visibility_config {
+    cloudwatch_metrics_enabled = true
+    sampled_requests_enabled   = true
+    metric_name                = "web_acl"
+  }
+
+    dynamic "rule" {
+    for_each = var.managed_rules
+    content {
+      name     = rule.value.name
+      priority = rule.value.priority
+
+      override_action {
+        dynamic "none" {
+          for_each = rule.value.override_action == "none" ? [1] : []
+          content {}
+        }
+
+        dynamic "count" {
+          for_each = rule.value.override_action == "count" ? [1] : []
+          content {}
+        }
+      }
+
+      statement {
+        managed_rule_group_statement {
+          name        = rule.value.name
+          vendor_name = "AWS"
+
+          dynamic "excluded_rule" {
+            for_each = rule.value.excluded_rules
+            content {
+              name = excluded_rule.value
+            }
+          }
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = rule.value.name
+        sampled_requests_enabled   = true
+      }
+    }
+  }
+
+    dynamic "rule" {
+    for_each = var.ip_sets_rules
+    content {
+      name     = rule.value.name
+      priority = rule.value.priority
+
+      action {
+        dynamic "allow" {
+          for_each = rule.value.action == "allow" ? [1] : []
+          content {}
+        }
+
+        dynamic "count" {
+          for_each = rule.value.action == "count" ? [1] : []
+          content {}
+        }
+
+        dynamic "block" {
+          for_each = rule.value.action == "block" ? [1] : []
+          content {}
+        }
+      }
+
+      statement {
+        ip_set_reference_statement {
+          arn = rule.value.ip_set_arn
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = rule.value.name
+        sampled_requests_enabled   = true
+      }
+    }
+  }  
+
+ }
 
 
 ###############################################################################
@@ -170,21 +226,20 @@ resource "aws_cloudfront_origin_access_identity" "default" {}
 
 resource "aws_cloudfront_distribution" "s3_distribution" {
   origin {
-    domain_name = aws_s3_bucket.website.website_endpoint
+    domain_name = aws_s3_bucket.website.bucket_regional_domain_name
     origin_id   = "website"
 
     s3_origin_config {
-      origin_access_identity ="${aws_cloudfront_origin_access_identity.default.cloudfront_access_identity_path}"
+      origin_access_identity =aws_cloudfront_origin_access_identity.default.cloudfront_access_identity_path
     }
   }
 
   enabled         = true
   depends_on      = [aws_acm_certificate.acm]
   is_ipv6_enabled = true
-  comment         = "Managed by Terraform"
-  #web_acl_id          = aws_wafv2_web_acl.web_acl.arn
+  web_acl_id          = aws_wafv2_web_acl.web_acl.arn
   default_root_object = "index.html"
-  aliases             = [var.domain_name]
+  aliases             = concat([var.domain_name], var.alias_domains)
 
   default_cache_behavior {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
@@ -213,18 +268,9 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
     }
   }
 
-  tags = {
-    Environment = var.env
-  }
-
   viewer_certificate {
-    # The ARN of the AWS Certificate Manager certificate that you wish to use with this distribution.
     acm_certificate_arn = aws_acm_certificate.acm.arn
-
-    # The minimum version of the SSL protocol that you want CloudFront to use for HTTPS connections.
     minimum_protocol_version = "TLSv1"
-
-    # Specifies how you want CloudFront to serve HTTPS requests.
     ssl_support_method = "sni-only"
   }
 }
@@ -235,12 +281,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
 
 resource "aws_route53_zone" "main" {
   name          = var.domain_name
-  comment       = "Managed by Terraform"
   force_destroy = true
-
-  tags = {
-    Environment = var.env
-  }
 }
 
 resource "aws_route53_record" "A" {
@@ -273,13 +314,13 @@ resource "aws_route53_record" "CNAME" {
   }
 }
 
-resource "aws_route53_record" "cert_validation" {
-  count = length(var.alias_domains) + 1
+# resource "aws_route53_record" "cert_validation" {
+#   count = length(var.alias_domains) + 1
 
-  zone_id = aws_route53_zone.main.zone_id
-  ttl     = 60
+#   zone_id = aws_route53_zone.main.zone_id
+#   ttl     = 60
 
-  name    = tolist(aws_acm_certificate.acm.domain_validation_options)[count.index].resource_record_name
-  type    = tolist(aws_acm_certificate.acm.domain_validation_options)[count.index].resource_record_type
-  records = [tolist(aws_acm_certificate.acm.domain_validation_options)[count.index].resource_record_value]
-}
+#   name    = tolist(aws_acm_certificate.acm.domain_validation_options)[count.index].resource_record_name
+#   type    = tolist(aws_acm_certificate.acm.domain_validation_options)[count.index].resource_record_type
+#   records = [tolist(aws_acm_certificate.acm.domain_validation_options)[count.index].resource_record_value]
+# }

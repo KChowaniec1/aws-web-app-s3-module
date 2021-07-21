@@ -26,3 +26,8 @@ output "cloudfront_distribution_id" {
 output "cloudfront_distribution_arn" {
   value = "${aws_cloudfront_distribution.s3_distribution.arn}"
 }
+
+output "web_acl_id" {
+  description = "The ARN of the WAF WebACL."
+  value       = aws_wafv2_web_acl.web_acl.arn
+}

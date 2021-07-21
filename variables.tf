@@ -2,10 +2,7 @@
 variable "domain_name" {
   type = string
 }
-variable "env" {
-  type    = string
-  default = "dev"
-}
+
 variable "website_bucket_name" {
   type = string
 }
@@ -21,39 +18,31 @@ variable "alias_domains" {
   default     = []
 }
 
+variable "managed_rules" {
+  type = list(object({
+    name            = string
+    priority        = number
+    override_action = string
+    excluded_rules  = list(string)
+  }))
+  description = "List of Managed WAF rules."
+  default = [
+    {
+      name            = "AWSManagedRulesCommonRuleSet",
+      priority        = 10
+      override_action = "none"
+      excluded_rules  = []
+    }
+  ]
+}
 
-# variable "rules" {
-#   type    = list
-#   default = [
-#     {
-#       name = "AWS-AWSManagedRulesLinuxRuleSet"
-#       priority = 0
-#       managed_rule_group_statement_name = "AWS-AWSManagedRulesLinuxRuleSet"
-#       managed_rule_group_statement_vendor_name = "AWS"
-#       metric_name = "foo_name"
-#     },
-#     {
-#     "Name": "AWS-AWSManagedRulesCommonRuleSet",
-#     "Priority": 0,
-#     "Statement": {
-#       "ManagedRuleGroupStatement": {
-#         "VendorName": "AWS",
-#         "Name": "AWSManagedRulesCommonRuleSet",
-#         "ExcludedRules": [
-#           {
-#             "Name": "NoUserAgent_HEADER"
-#           }
-#         ]
-#       }
-#     },
-#     "OverrideAction": {
-#       "None": {}
-#     },
-#     "VisibilityConfig": {
-#       "SampledRequestsEnabled": true,
-#       "CloudWatchMetricsEnabled": true,
-#       "MetricName": "AWS-AWSManagedRulesCommonRuleSet"
-#     }
-# }
-#   ]
-# }
+variable "ip_sets_rules" {
+  type = list(object({
+    name            = string
+    priority        = number
+    action          = string
+    ip_set_arn      = string
+  }))
+  description = "List of custom IP set WAF rules."
+  default = []
+}
