@@ -1,7 +1,7 @@
 # Terraform Module for Web App Hosted by S3 Bucket on AWS
 
 This Terraform module deploys a web application to AWS.
-It uses S3, CloudFront, and Route53 services. 
+It uses S3, CloudFront, WAF, and Route53 services. 
 It hosts all static assets found in the directory on S3 and adds them to a CloudFront distribution.
 Then all traffic to the domain get routed to CloudFront.
 
