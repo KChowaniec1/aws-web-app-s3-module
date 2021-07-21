@@ -68,14 +68,12 @@ Optional:
 
       type: list(object)
       description: The list of AWS managed rules to apply to the WAF
-      default: [    
-	  {
+      default: [{
       name            = "AWSManagedRulesCommonRuleSet",
       priority        = 10
       override_action = "none"
       excluded_rules  = []
-	  }
-	]
+	  }]
 
 - **ip_sets_rules**
 
