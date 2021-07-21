@@ -124,8 +124,7 @@ resource "aws_acm_certificate" "acm" {
 ###############################################################################
 
 resource "aws_wafv2_web_acl" "web_acl" {
-    name        = "web_acl"
-    description = "Web ACL"
+    name        = "cloudfront_acl"
     scope       = "CLOUDFRONT"
     #provider    = aws.us-east-1
     default_action {
@@ -135,7 +134,7 @@ resource "aws_wafv2_web_acl" "web_acl" {
     visibility_config {
     cloudwatch_metrics_enabled = true
     sampled_requests_enabled   = true
-    metric_name                = "web_acl"
+    metric_name                = "cloudfront_acl"
   }
 
     dynamic "rule" {
