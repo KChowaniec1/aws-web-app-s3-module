@@ -9,7 +9,7 @@ Then all traffic to the domain get routed to CloudFront.
 
 ### How to use
 
-1.  create the following main.tf in your project root directory. Replace the `aws.profile` and `aws-static-website.domain_name`. Region defaults to `us-east-1` due to ACM Certificate Manager requirements.
+1.  Create the following main.tf in your project root directory. Replace the `aws.profile` and `aws-static-website.domain_name`. Region defaults to `us-east-1` due to ACM Certificate Manager requirements.
 
     ```terraform
     # main.tf
@@ -27,15 +27,13 @@ Then all traffic to the domain get routed to CloudFront.
 
 1.  Initialize and run terraform apply
 
-```
-    terraform init
+	```terraform 
+	terraform init
 
-Next run the plan and apply commands.
-    
     terraform plan    #=> generates an execution plan.
     terraform apply   #=> builds infrastructure on AWS.
+   
     ```
-
 
 ## Variables
 
