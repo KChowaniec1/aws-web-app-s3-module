@@ -4,7 +4,13 @@ This Terraform module deploys a web application to AWS.
 It uses S3, CloudFront, ACM, WAF, and Route53 services. 
 All static assets provided in the app source directory are hosted on S3 and then added to a CloudFront distribution.
 A SSL certificate is created for the domain name and all traffic to the domain gets routed to CloudFront via a Route 53 entry.
-The CloudFront distribution has a web application firewall (WAF) associated with it to provide rule-based security (more rules/rule types may be added in the future).
+The CloudFront distribution has a web application firewall (WAF) associated with it to provide rule-based security.
+
+##Design Considerations
+CloudFront was chosen as a CDN for the static assets stored in the S3 bucket due to its ability to cache contents and serve over https (more secure) with SSL certificates provisioned by ACM. 
+The origin S3 bucket uses server-side encryption to help protect contents as they are uploaded. Versioning is also enabled in case older versions of content are needed. CORS headers are allowed/enabled to support calling external sites.
+Multiple subdomains/alias domains are accepted as Route53 can support redirecting these domains to the same CloudFront distribution. 
+The WAF service can support many more types of rules than the ones provided in this module. These additonal types of custom rules can be added in the future. 
 
 ## Getting started
 
